@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "functions": {
+    "api/whatsapp.js": { "memory": 256 },
+    "api/stripe-webhook.js": { "memory": 128 }
+  }
+}
