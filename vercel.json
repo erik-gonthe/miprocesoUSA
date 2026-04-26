@@ -1,7 +1,9 @@
 {
   "version": 2,
-  "functions": {
-    "api/whatsapp.js": { "memory": 256 },
-    "api/stripe-webhook.js": { "memory": 128 }
-  }
+  "rewrites": [
+    { "source": "/api/case", "destination": "/api/case.js" },
+    { "source": "/api/whatsapp", "destination": "/api/whatsapp.js" },
+    { "source": "/api/stripe-webhook", "destination": "/api/stripe-webhook.js" },
+    { "source": "/(.*)", "destination": "/public/index.html" }
+  ]
 }
