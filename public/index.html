@@ -65,8 +65,7 @@
     <div class="search-box">
       <span class="search-label">Número de recibo</span>
       <div class="input-row">
-        <input id="receipt" type="text" placeholder="IOE0931774969" autocapitalize="characters"
-          onkeydown="if(event.key==='Enter') buscar()" />
+        <input id="receipt" type="text" placeholder="IOE0931774969" autocapitalize="characters" />
         <button id="btn" onclick="buscar()">Consultar</button>
       </div>
       <div id="result"></div>
@@ -110,35 +109,10 @@
     Información obtenida de uscis.gov. No somos abogados.
   </footer>
 
-  <!-- Hidden iframe for USCIS token fetch -->
-  <iframe id="uscis-frame" style="display:none" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
-
   <script>
-    const EVENT_CODES = {
-      IAF: "Caso recibido por USCIS",
-      FTA0: "Biometría reutilizada — no necesitas cita",
-      RFE: "Solicitud de evidencia adicional (RFE)",
-      RFEC: "Respuesta a RFE recibida",
-      APD: "✅ Caso APROBADO",
-      DND: "❌ Caso denegado",
-      TRF: "Caso transferido a otra oficina",
-      INT: "Entrevista programada",
-      NTA: "Aviso de comparecencia",
-      WLC: "Carta de bienvenida enviada",
-      CPO: "Tarjeta en producción",
-      CPD: "Tarjeta entregada",
-    };
-
-    const CENTER_MAP = {
-      IOE: "Presentación Electrónica (ELIS)",
-      LIN: "Centro de Servicio Nebraska",
-      SRC: "Centro de Servicio Texas",
-      WAC: "Centro de Servicio California",
-      EAC: "Centro de Servicio Vermont",
-      MSC: "Centro Nacional de Beneficios",
-      NBC: "Centro Nacional de Beneficios",
-      YSC: "Centro de Servicio Potomac",
-    };
+    document.getElementById("receipt").addEventListener("keydown", function(e) {
+      if (e.key === "Enter") buscar();
+    });
 
     async function buscar() {
       const input = document.getElementById("receipt");
@@ -146,102 +120,37 @@
       const result = document.getElementById("result");
       const receipt = input.value.trim().toUpperCase();
 
-      if (!receipt || !/^[A-Z]{3}\d{10}$/.test(receipt)) {
-        result.innerHTML = `<div class="error-box">Formato inválido. Debe ser 3 letras + 10 números.<br>Ejemplo: <strong>IOE0931774969</strong></div>`;
-        return;
-      }
+      if (!receipt) return;
 
       btn.disabled = true;
       btn.textContent = "...";
-      result.innerHTML = `<div class="info-box">🔍 Consultando USCIS...</div>`;
+      result.innerHTML = '<div class="info-box">🔍 Consultando USCIS...</div>';
 
       try {
-        // Step 1: Get auth token from USCIS
-        async function buscar() {   const input = document.getElementById("receipt");   const btn = document.getElementById("btn");   const result = document.getElementById("result");   const receipt = input.value.trim().toUpperCase();   if (!receipt) return;    btn.disabled = true; btn.textContent = "...";   result.innerHTML = `<div class="info-box">🔍 Consultando USCIS...</div>`;    try {     const res = await fetch(`/api/case?receipt=${receipt}`);     const json = await res.json();     if (!res.ok || json.error) throw new Error(json.error);     const d = json.data || json;     result.innerHTML = `       <div class="result-card">         <div class="result-receipt">${d.receiptNumber}</div>         <div class="result-center">${d.center || ''}</div>         <div class="status-title">🟢 ${d.status}</div>         ${d.description ? `<div class="status-desc">${d.description}</div>` : ''}         <div class="disclaimer">Información de uscis.gov. No somos abogados.</div>       </div>`;   } catch(e) {     result.innerHTML = `<div class="error-box">No se pudo obtener el caso. Intenta de nuevo.</div>`;   } finally {     btn.disabled = false; btn.textContent = "Consultar";   } }, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-          },
-          body: JSON.stringify({ receiptNumber: receipt }),
-          mode: "cors",
-          credentials: "omit",
-        });
+        const res = await fetch("/api/case?receipt=" + receipt);
+        const json = await res.json();
 
-        if (!tokenRes.ok) throw new Error("token_failed");
-        const tokenData = await tokenRes.json();
-        const token = tokenData.token || tokenData.accessToken || tokenData.access_token;
-        if (!token) throw new Error("no_token");
+        if (!res.ok || json.error) {
+          result.innerHTML = '<div class="error-box">No se encontró el caso <strong>' + receipt + '</strong>. Verifica el número e intenta de nuevo.</div>';
+          return;
+        }
 
-        // Step 2: Get case status
-        const caseRes = await fetch(`https://egov.uscis.gov/csol-api/case-statuses/${receipt}`, {
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          mode: "cors",
-          credentials: "omit",
-        });
-
-        if (!caseRes.ok) throw new Error("case_failed");
-        const json = await caseRes.json();
         const d = json.data || json;
-        renderCase(d, result);
+        result.innerHTML =
+          '<div class="result-card">' +
+            '<div class="result-receipt">' + d.receiptNumber + '</div>' +
+            '<div class="result-center">' + (d.center || '') + '</div>' +
+            '<div class="status-title">🟢 ' + (d.status || 'Estatus no disponible') + '</div>' +
+            (d.description ? '<div class="status-desc">' + d.description + '</div>' : '') +
+            '<div class="disclaimer">Información obtenida de uscis.gov. No somos abogados ni representantes legales. Para asesoría migratoria consulta un profesional autorizado.</div>' +
+          '</div>';
 
-      } catch (e) {
-        // Fallback: redirect to USCIS with the receipt number
-        result.innerHTML = `
-          <div class="error-box">
-            No pudimos conectar directamente con USCIS.<br><br>
-            <a href="https://egov.uscis.gov/casestatus/mycasestatus.do?appReceiptNum=${receipt}" 
-               target="_blank" 
-               style="color:#34d399;text-decoration:none;font-weight:600;">
-              → Ver en el sitio oficial de USCIS ↗
-            </a>
-          </div>`;
+      } catch(e) {
+        result.innerHTML = '<div class="error-box">Error de conexión. Intenta de nuevo.</div>';
       } finally {
         btn.disabled = false;
         btn.textContent = "Consultar";
       }
-    }
-
-    function renderCase(d, result) {
-      const events = [...(d.events || [])].sort((a, b) => new Date(b.eventTimestamp) - new Date(a.eventTimestamp));
-      const unique = [];
-      const seen = new Set();
-      for (const ev of events) {
-        if (!seen.has(ev.eventCode)) { unique.push(ev); seen.add(ev.eventCode); }
-        if (unique.length >= 3) break;
-      }
-
-      let statusEmoji = "🟢";
-      if (d.closed) statusEmoji = "⚫";
-      else if (d.actionRequired) statusEmoji = "🔴";
-
-      const prefix = d.receiptNumber?.substring(0, 3) || "";
-
-      result.innerHTML = `
-        <div class="result-card">
-          <div class="result-receipt">${d.receiptNumber}</div>
-          <div class="result-center">${CENTER_MAP[prefix] || "Centro de Servicio USCIS"}</div>
-          <div class="status-title">${statusEmoji} ${d.closed ? "Cerrado" : d.actionRequired ? "Acción requerida" : "Activo"}
-            ${d.areAllGroupMembersAuthorizedForTravel ? " &nbsp;·&nbsp; ✈️ Autorizado para viajar" : ""}
-          </div>
-          ${unique.length > 0 ? `
-            <div style="font-size:10px;letter-spacing:2px;text-transform:uppercase;color:#5a5d72;font-family:'JetBrains Mono',monospace;margin-bottom:10px">Eventos recientes</div>
-            ${unique.map(ev => `
-              <div style="display:flex;gap:10px;margin-bottom:10px">
-                <div>
-                  <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:#34d399">${ev.eventCode}</div>
-                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#3d3f52">${new Date(ev.eventTimestamp).toLocaleDateString("es-MX",{month:"short",day:"numeric",year:"numeric"})}</div>
-                </div>
-                <div style="font-size:13px;color:#8b8fa3;padding-top:2px">${EVENT_CODES[ev.eventCode] || ev.eventCode}</div>
-              </div>
-            `).join("")}
-          ` : ""}
-          <div class="disclaimer">Información obtenida de uscis.gov. No somos abogados ni representantes legales.</div>
-        </div>`;
     }
   </script>
 </body>
