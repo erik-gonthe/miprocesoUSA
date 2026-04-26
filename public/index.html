@@ -157,7 +157,7 @@
 
       try {
         // Step 1: Get auth token from USCIS
-        const tokenRes = await fetch("https://egov.uscis.gov/csol-api/auth-token", {
+        async function buscar() {   const input = document.getElementById("receipt");   const btn = document.getElementById("btn");   const result = document.getElementById("result");   const receipt = input.value.trim().toUpperCase();   if (!receipt) return;    btn.disabled = true; btn.textContent = "...";   result.innerHTML = `<div class="info-box">🔍 Consultando USCIS...</div>`;    try {     const res = await fetch(`/api/case?receipt=${receipt}`);     const json = await res.json();     if (!res.ok || json.error) throw new Error(json.error);     const d = json.data || json;     result.innerHTML = `       <div class="result-card">         <div class="result-receipt">${d.receiptNumber}</div>         <div class="result-center">${d.center || ''}</div>         <div class="status-title">🟢 ${d.status}</div>         ${d.description ? `<div class="status-desc">${d.description}</div>` : ''}         <div class="disclaimer">Información de uscis.gov. No somos abogados.</div>       </div>`;   } catch(e) {     result.innerHTML = `<div class="error-box">No se pudo obtener el caso. Intenta de nuevo.</div>`;   } finally {     btn.disabled = false; btn.textContent = "Consultar";   } }, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
